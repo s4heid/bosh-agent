@@ -81,7 +81,11 @@ func NewProvider(logger boshlog.Logger, dirProvider boshdirs.Provider, statsColl
 	ipResolver := boship.NewResolver(boship.NetworkInterfaceToAddrsFunc)
 
 	arping := bosharp.NewArping(runner, fs, logger, ArpIterations, ArpIterationDelay, ArpInterfaceCheckDelay)
-	interfaceConfigurationCreator := boshnet.NewInterfaceConfigurationCreator(logger)
+
+	// Create interface driver detector and synthetic interface selector for Azure accelerated networking support
+	interfaceDriverDetector := boshnet.NewInterfaceDriverDetector(fs, runner, logger)
+	interfaceSelector := boshnet.NewSyntheticInterfaceSelector(interfaceDriverDetector, logger)
+	interfaceConfigurationCreator := boshnet.NewInterfaceConfigurationCreatorWithSelector(logger, interfaceSelector)
 
 	interfaceAddressesProvider := boship.NewSystemInterfaceAddressesProvider()
 

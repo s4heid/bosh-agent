@@ -115,14 +115,22 @@ type InterfaceConfigurationCreator interface {
 }
 
 type interfaceConfigurationCreator struct {
-	logger boshlog.Logger
-	logTag string
+	logger            boshlog.Logger
+	logTag            string
+	interfaceSelector InterfaceSelector
 }
 
 func NewInterfaceConfigurationCreator(logger boshlog.Logger) InterfaceConfigurationCreator {
+	// For backward compatibility, we'll create a default interface selector here
+	// The actual platform managers can inject their own selector if needed
+	return NewInterfaceConfigurationCreatorWithSelector(logger, nil)
+}
+
+func NewInterfaceConfigurationCreatorWithSelector(logger boshlog.Logger, selector InterfaceSelector) InterfaceConfigurationCreator {
 	return interfaceConfigurationCreator{
-		logger: logger,
-		logTag: "interfaceConfigurationCreator",
+		logger:            logger,
+		logTag:            "interfaceConfigurationCreator",
+		interfaceSelector: selector,
 	}
 }
 
@@ -152,15 +160,30 @@ func (creator interfaceConfigurationCreator) createMultipleInterfaceConfiguratio
 	}
 
 	// Configure interfaces with network settings matching MAC address.
-	// If we cannot find a network setting with a matching MAC address, configure that interface as DHCP
 	var networkSettings boshsettings.Network
 	var err error
 	staticConfigs := []StaticInterfaceConfiguration{}
 	dhcpConfigs := []DHCPInterfaceConfiguration{}
 
+	// Collect networks without specific MACs for later processing
+	networksWithoutMAC := boshsettings.Networks{}
+	for networkName, network := range networks {
+		if network.Mac == "" && network.Alias == "" {
+			networksWithoutMAC[networkName] = network
+		}
+	}
+
 	// create interface configuration for networks that have a MAC specified
 	for mac, ifaceName := range interfacesByMAC {
 		networksSettings := networks.NetworksForMac(mac)
+
+		// Only process if there are actual networks with this MAC (not the default empty one)
+		if len(networksSettings) == 1 && networksSettings[0].Mac == "" && networksSettings[0].Type == "" {
+			// This is the default empty network returned by NetworksForMac when no match is found
+			// Skip it - we'll handle unmatched interfaces below
+			continue
+		}
+
 		for _, networkSettings = range networksSettings {
 			staticConfigs, dhcpConfigs, err = creator.createInterfaceConfiguration(staticConfigs, dhcpConfigs, ifaceName, networkSettings)
 			if err != nil {
@@ -169,7 +192,69 @@ func (creator interfaceConfigurationCreator) createMultipleInterfaceConfiguratio
 		}
 	}
 
-	// create interface configuration for networks that do not have a MAC or have an alias
+	// Handle networks without specific MACs - use interface selector if available
+	if len(networksWithoutMAC) > 0 {
+		// Get unassigned interfaces (not already configured above)
+		unassignedInterfaces := make(map[string]string)
+		for mac, ifaceName := range interfacesByMAC {
+			// Check if this interface was already assigned to a network with specific MAC
+			networksSettings := networks.NetworksForMac(mac)
+			hasSpecificNetwork := false
+			for _, net := range networksSettings {
+				if net.Mac == mac {
+					hasSpecificNetwork = true
+					break
+				}
+			}
+			if !hasSpecificNetwork {
+				unassignedInterfaces[mac] = ifaceName
+			}
+		}
+
+		// For each network without MAC, select the best interface if available
+		networksWithoutMACList := make([]boshsettings.Network, 0, len(networksWithoutMAC))
+		for _, network := range networksWithoutMAC {
+			networksWithoutMACList = append(networksWithoutMACList, network)
+		}
+
+		for range networksWithoutMACList {
+			if len(unassignedInterfaces) == 0 {
+				// No more unassigned interfaces available - skip remaining networks without MAC
+				creator.logger.Debug(creator.logTag, "No available interfaces for remaining networks without specific MAC addresses")
+				break
+			}
+
+			var selectedMAC, selectedInterface string
+			if creator.interfaceSelector != nil {
+				selectedMAC, selectedInterface, err = creator.interfaceSelector.SelectInterface(unassignedInterfaces)
+				if err != nil {
+					creator.logger.Debug(creator.logTag, "Interface selector failed: %s, falling back to first available", err.Error())
+					// Fallback to first available
+					for mac, ifaceName := range unassignedInterfaces {
+						selectedMAC, selectedInterface = mac, ifaceName
+						break
+					}
+				}
+			} else {
+				// No selector, use first available
+				for mac, ifaceName := range unassignedInterfaces {
+					selectedMAC, selectedInterface = mac, ifaceName
+					break
+				}
+			}
+
+			// Remove selected interface from unassigned list
+			delete(unassignedInterfaces, selectedMAC)
+
+			// For networks without MAC, always create DHCP configuration
+			// The lack of MAC indicates that specific interface assignment is not required
+			dhcpConfigs = append(dhcpConfigs, DHCPInterfaceConfiguration{
+				Name: selectedInterface,
+			})
+		}
+	}
+
+	// create interface configuration for networks that have an alias
 	for _, networkSettings = range networks {
 		if networkSettings.Mac != "" || networkSettings.Alias == "" {
 			continue
@@ -224,6 +309,17 @@ func (creator interfaceConfigurationCreator) getFirstNetwork(networks boshsettin
 }
 
 func (creator interfaceConfigurationCreator) getFirstInterface(interfacesByMAC map[string]string) (string, string) {
+	// If we have an interface selector, use it to choose the best interface
+	if creator.interfaceSelector != nil {
+		mac, ifaceName, err := creator.interfaceSelector.SelectInterface(interfacesByMAC)
+		if err != nil {
+			creator.logger.Debug(creator.logTag, "Interface selector failed: %s, falling back to default selection", err.Error())
+		} else {
+			return mac, ifaceName
+		}
+	}
+
+	// Fallback to original behavior: return first interface found
 	for mac := range interfacesByMAC {
 		return mac, interfacesByMAC[mac]
 	}
