@@ -423,17 +423,17 @@ func (net UbuntuNetManager) writeNetworkInterfaces(
 		anyChanged = anyChanged || changed
 	}
 
-	for networkFile, isStale := range staleNetworkConfigFiles {
+	for networkFile, _ := range staleNetworkConfigFiles {
 		if networkFile == systemdNetworkFolder {
 			continue
 		}
-		if isStale {
-			err := net.fs.RemoveAll(networkFile)
-			if err != nil {
-				return false, err
-			}
-			anyChanged = true
-		}
+		// if isStale {
+		// 	err := net.fs.RemoveAll(networkFile)
+		// 	if err != nil {
+		// 		return false, err
+		// 	}
+		// 	anyChanged = true
+		// }
 	}
 	return anyChanged, nil
 }
