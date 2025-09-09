@@ -138,6 +138,7 @@ func (creator interfaceConfigurationCreator) CreateInterfaceConfigurations(netwo
 	// In cases where we only have one network and it has no MAC address (either because the IAAS doesn't give us one or
 	// it's an old CPI), if we only have one interface, we should map them
 	if len(networks) == 1 && len(interfacesByMAC) == 1 {
+		creator.logger.Debug(creator.logTag, "Mapping single network to single interface: %v", interfacesByMAC)
 		networkSettings := creator.getFirstNetwork(networks)
 		if networkSettings.Mac == "" {
 			var ifaceName string
@@ -311,15 +312,18 @@ func (creator interfaceConfigurationCreator) getFirstNetwork(networks boshsettin
 func (creator interfaceConfigurationCreator) getFirstInterface(interfacesByMAC map[string]string) (string, string) {
 	// If we have an interface selector, use it to choose the best interface
 	if creator.interfaceSelector != nil {
+		creator.logger.Debug(creator.logTag, "Using interface selector to choose interface")
 		mac, ifaceName, err := creator.interfaceSelector.SelectInterface(interfacesByMAC)
-		if err != nil {
-			creator.logger.Debug(creator.logTag, "Interface selector failed: %s, falling back to default selection", err.Error())
-		} else {
+		if err == nil {
+			creator.logger.Debug(creator.logTag, "Interface selector succeeded: %s -> %s", ifaceName, mac)
 			return mac, ifaceName
 		}
+
+		creator.logger.Debug(creator.logTag, "Interface selector failed: %s, falling back to default selection", err.Error())
 	}
 
 	// Fallback to original behavior: return first interface found
+	creator.logger.Debug(creator.logTag, "Interface selector failed, falling back to first available interface")
 	for mac := range interfacesByMAC {
 		return mac, interfacesByMAC[mac]
 	}

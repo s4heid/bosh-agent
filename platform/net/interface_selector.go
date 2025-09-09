@@ -38,6 +38,7 @@ func (s syntheticInterfaceSelector) SelectInterface(interfacesByMAC map[string]s
 	}
 
 	// Look for synthetic interfaces first (preferred for Azure accelerated networking)
+	s.logger.Debug(s.logTag, "Looking for synthetic interfaces in %d available interfaces", len(interfacesByMAC))
 	syntheticInterfaces := make(map[string]string)
 	otherInterfaces := make(map[string]string)
 

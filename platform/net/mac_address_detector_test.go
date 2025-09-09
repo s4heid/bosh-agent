@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	fakesys "github.com/cloudfoundry/bosh-utils/system/fakes"
 
 	. "github.com/cloudfoundry/bosh-agent/v2/platform/net"
@@ -19,12 +20,14 @@ var _ = Describe("MacAddressDetector", func() {
 		var (
 			fs                 *fakesys.FakeFileSystem
 			macAddressDetector MACAddressDetector
+			logger             boshlog.Logger
 		)
 
 		BeforeEach(func() {
 			if runtime.GOOS == "windows" {
 				Skip("Only run on unix")
 			}
+			logger = boshlog.NewLogger(boshlog.LevelNone)
 		})
 
 		writeNetworkDevice := func(iface string, macAddress string, isPhysical bool, ifalias string) string {
@@ -63,7 +66,7 @@ var _ = Describe("MacAddressDetector", func() {
 
 		BeforeEach(func() {
 			fs = fakesys.NewFakeFileSystem()
-			macAddressDetector = NewLinuxMacAddressDetector(fs)
+			macAddressDetector = NewLinuxMacAddressDetector(fs, logger)
 		})
 
 		Describe("DetectMacAddresses", func() {
@@ -118,9 +121,11 @@ var _ = Describe("MacAddressDetector", func() {
 			runner                    *fakesys.FakeCmdRunner
 			interfacesFunctionReturns []gonet.Interface
 			interfacesFunctionError   error
+			logger                    boshlog.Logger
 		)
 
 		BeforeEach(func() {
+			logger = boshlog.NewLogger(boshlog.LevelNone)
 			runner = fakesys.NewFakeCmdRunner()
 			macAddress, _ = gonet.ParseMAC("12:34:56:78:9a:bc") //nolint:errcheck
 			fakeInterfacesFunction := func() ([]gonet.Interface, error) {
@@ -131,7 +136,7 @@ var _ = Describe("MacAddressDetector", func() {
 			}
 			interfacesFunctionReturns = []gonet.Interface{}
 			interfacesFunctionError = nil
-			macAddressDetector = NewWindowsMacAddressDetector(runner, fakeInterfacesFunction)
+			macAddressDetector = NewWindowsMacAddressDetector(runner, fakeInterfacesFunction, logger)
 		})
 
 		Context("when only one adapter exists", func() {

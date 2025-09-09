@@ -98,7 +98,7 @@ func NewProvider(logger boshlog.Logger, dirProvider boshdirs.Provider, statsColl
 	}
 
 	kernelIPv6 := boshnet.NewKernelIPv6Impl(fs, runner, logger)
-	macAddressDetector := boshnet.NewLinuxMacAddressDetector(fs)
+	macAddressDetector := boshnet.NewLinuxMacAddressDetector(fs, logger)
 
 	centosNetManager := boshnet.NewCentosNetManager(fs, runner, ipResolver, macAddressDetector, interfaceConfigurationCreator, interfaceAddressesProvider, dnsResolver, arping, logger)
 	ubuntuNetManager := boshnet.NewUbuntuNetManager(fs, runner, ipResolver, macAddressDetector, interfaceConfigurationCreator, interfaceAddressesProvider, dnsResolver, arping, kernelIPv6, logger)
@@ -106,7 +106,7 @@ func NewProvider(logger boshlog.Logger, dirProvider boshdirs.Provider, statsColl
 	windowsNetManager := boshnet.NewWindowsNetManager(
 		runner,
 		interfaceConfigurationCreator,
-		boshnet.NewWindowsMacAddressDetector(runner, gonet.Interfaces),
+		boshnet.NewWindowsMacAddressDetector(runner, gonet.Interfaces, logger),
 		logger,
 		clock,
 		fs,

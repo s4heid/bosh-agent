@@ -58,7 +58,8 @@ var _ = Describe("Azure Accelerated Networking Integration", func() {
 				}
 
 				// Setup synthetic interface
-				fs.WriteFileString("/sys/class/net/eth0/address", "00:0d:3a:f5:76:bd")
+				err := fs.WriteFileString("/sys/class/net/eth0/address", "00:0d:3a:f5:76:bd")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i eth0", fakesys.FakeCmdResult{
 					Stdout: `driver: hv_netvsc
 version: 
@@ -73,7 +74,8 @@ supports-priv-flags: no`,
 				})
 
 				// Setup VF interface (enP53091s1np0) if it were to be detected
-				fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "00:0d:3a:f5:76:bd")
+				err = fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "00:0d:3a:f5:76:bd")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i enP53091s1np0", fakesys.FakeCmdResult{
 					Stdout: `driver: mlx5_core
 version: 5.0-0
@@ -123,7 +125,8 @@ supports-priv-flags: no`,
 				}
 
 				// Setup VF interface
-				fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "aa:bb:cc:dd:ee:01")
+				err := fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "aa:bb:cc:dd:ee:01")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i enP53091s1np0", fakesys.FakeCmdResult{
 					Stdout: `driver: mlx5_core
 version: 5.0-0
@@ -131,7 +134,8 @@ firmware-version: 14.25.8362`,
 				})
 
 				// Setup synthetic interface
-				fs.WriteFileString("/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:02")
+				err = fs.WriteFileString("/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:02")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i eth0", fakesys.FakeCmdResult{
 					Stdout: `driver: hv_netvsc
 version: 
@@ -173,7 +177,8 @@ firmware-version: `,
 				}
 
 				// Setup VF interface
-				fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "aa:bb:cc:dd:ee:01")
+				err := fs.WriteFileString("/sys/class/net/enP53091s1np0/address", "aa:bb:cc:dd:ee:01")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i enP53091s1np0", fakesys.FakeCmdResult{
 					Stdout: `driver: mlx5_core
 version: 5.0-0
@@ -215,7 +220,8 @@ firmware-version: 14.25.8362`,
 				}
 
 				// Setup virtio interface (common in AWS, KVM)
-				fs.WriteFileString("/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:01")
+				err := fs.WriteFileString("/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:01")
+				Expect(err).ToNot(HaveOccurred())
 				runner.AddCmdResult("ethtool -i eth0", fakesys.FakeCmdResult{
 					Stdout: `driver: virtio_net
 version: 1.0.0

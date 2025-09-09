@@ -55,9 +55,11 @@ supports-priv-flags: no`,
 				runner.AddCmdResult("ethtool -i eth0", fakesys.FakeCmdResult{
 					Error: errors.New("ethtool failed"),
 				})
-				fs.WriteFileString("/sys/class/net/eth0/device/driver", "")
+				err := fs.WriteFileString("/sys/class/net/eth0/device/driver", "")
+				Expect(err).ToNot(HaveOccurred())
 				// Create a symlink to simulate the driver path
-				fs.Symlink("../../../drivers/net/hv_netvsc", "/sys/class/net/eth0/device/driver")
+				err = fs.Symlink("../../../drivers/net/hv_netvsc", "/sys/class/net/eth0/device/driver")
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("returns the driver name from sysfs", func() {
@@ -73,7 +75,8 @@ supports-priv-flags: no`,
 					Error: errors.New("ethtool failed"),
 				})
 				// Create interface directory but no device/driver symlink (for virtual interfaces)
-				fs.WriteFileString("/sys/class/net/veth0/address", "aa:bb:cc:dd:ee:ff")
+				err := fs.WriteFileString("/sys/class/net/veth0/address", "aa:bb:cc:dd:ee:ff")
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("returns empty string without error", func() {

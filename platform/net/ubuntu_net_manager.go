@@ -423,17 +423,21 @@ func (net UbuntuNetManager) writeNetworkInterfaces(
 		anyChanged = anyChanged || changed
 	}
 
-	for networkFile, _ := range staleNetworkConfigFiles {
+	for networkFile, isStale := range staleNetworkConfigFiles {
 		if networkFile == systemdNetworkFolder {
 			continue
 		}
-		// if isStale {
-		// 	err := net.fs.RemoveAll(networkFile)
-		// 	if err != nil {
-		// 		return false, err
-		// 	}
-		// 	anyChanged = true
-		// }
+		if strings.Contains(networkFile, "unmanaged-devices.network") {
+			continue
+		}
+
+		if isStale {
+			err := net.fs.RemoveAll(networkFile)
+			if err != nil {
+				return false, err
+			}
+			anyChanged = true
+		}
 	}
 	return anyChanged, nil
 }
