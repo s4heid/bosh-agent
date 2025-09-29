@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
+	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 )
 
@@ -21,12 +22,14 @@ const (
 )
 
 type linuxMacAddressDetector struct {
-	fs boshsys.FileSystem
+	fs     boshsys.FileSystem
+	logger boshlog.Logger
 }
 
 type windowsMacAddressDetector struct {
 	interfacesFunction func() ([]gonet.Interface, error)
 	runner             boshsys.CmdRunner
+	logger             boshlog.Logger
 }
 
 type netAdapter struct {
@@ -34,16 +37,18 @@ type netAdapter struct {
 	MacAddress string
 }
 
-func NewLinuxMacAddressDetector(fs boshsys.FileSystem) MACAddressDetector {
+func NewLinuxMacAddressDetector(fs boshsys.FileSystem, logger boshlog.Logger) MACAddressDetector {
 	return linuxMacAddressDetector{
-		fs: fs,
+		fs:     fs,
+		logger: logger,
 	}
 }
 
-func NewWindowsMacAddressDetector(runner boshsys.CmdRunner, interfacesFunction func() ([]gonet.Interface, error)) MACAddressDetector {
+func NewWindowsMacAddressDetector(runner boshsys.CmdRunner, interfacesFunction func() ([]gonet.Interface, error), logger boshlog.Logger) MACAddressDetector {
 	return windowsMacAddressDetector{
 		interfacesFunction: interfacesFunction,
 		runner:             runner,
+		logger:             logger,
 	}
 }
 
@@ -58,6 +63,7 @@ func (d linuxMacAddressDetector) DetectMacAddresses() (map[string]string, error)
 	var macAddress string
 	var ifalias string
 	for _, filePath := range filePaths {
+		d.logger.Debug("linuxMacAddressDetector", "Processing file %s", filePath)
 		isPhysicalDevice := d.fs.FileExists(path.Join(filePath, "device"))
 
 		// For third-party networking plugin case that the physical interface is used as bridge
@@ -77,12 +83,25 @@ func (d linuxMacAddressDetector) DetectMacAddresses() (map[string]string, error)
 			}
 
 			macAddress = strings.Trim(macAddress, "\n")
-
 			interfaceName := path.Base(filePath)
+
+			// Check if the interface is synthetic by checking if the master directory exists
+			// SR-IOV Interfaces have the same MAC address as the physical interface
+			// and should not be used by the application.
+			masterPath := path.Join(filePath, "master")
+			if d.fs.FileExists(masterPath) {
+				info, err := d.fs.Stat(masterPath)
+				if err == nil && info.IsDir() {
+					d.logger.Debug("linuxMacAddressDetector", "Skipping VF interface %s (%s)", interfaceName, filePath)
+					continue
+				}
+			}
+
 			addresses[macAddress] = interfaceName
 		}
 	}
 
+	d.logger.Debug("linuxMacAddressDetector", "Detected MAC addresses: %v", addresses)
 	return addresses, nil
 }
 

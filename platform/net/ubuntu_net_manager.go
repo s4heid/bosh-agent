@@ -427,6 +427,9 @@ func (net UbuntuNetManager) writeNetworkInterfaces(
 		if networkFile == systemdNetworkFolder {
 			continue
 		}
+		if strings.Contains(networkFile, "unmanaged-devices.network") {
+			continue
+		}
 		if isStale {
 			err := net.fs.RemoveAll(networkFile)
 			if err != nil {
